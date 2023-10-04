@@ -136,7 +136,10 @@ class PurgeSecrets:
         self._logger.debug(f"given purge age was converted to {self._purge_age_minutes} minutes.")
         return self._purge_age_minutes
 
-    def _final_file_check(self):
+    def _final_file_check(self, ** kwargs):
+        if kwargs:
+            if 'filepath' in kwargs:
+                self.filepath = kwargs['filepath']
         if self.filepath:
             final_file_check_text = f"Are you sure you want to purge {self.filepath}? (y/n/q): "
             purge = self._yn(final_file_check_text)
@@ -149,8 +152,12 @@ class PurgeSecrets:
                 self._logger.error(e, exc_info=True)
                 raise e
 
-    def PurgeFile(self):
+    def PurgeFile(self, **kwargs):
         self._logger.info("Running final checks before file purge.")
+        if kwargs:
+            if 'filepath' in kwargs:
+                self.filepath = kwargs['filepath']
+
         purge = self._final_file_check()
         if purge:
             try:
@@ -185,9 +192,20 @@ class PurgeSecrets:
             self._logger.warning(f"config file {secrets_section} section has NOT been blanked.")
 
     def TotalPurge(self, config: 'ConfigParser', config_path: str,
-                   secrets_section: str, secrets_items: list):
+                   secrets_section: str, secrets_items: list, **kwargs):
+        if kwargs:
+            if 'filepath' in kwargs:
+                self.filepath = kwargs['filepath']
         if self._purge_age_minutes:
-            self.PurgeFile()
+            if self.filepath:
+                self.PurgeFile()
+            else:
+                try:
+                    raise AttributeError("self.filepath cannot be none for TotalPurge to function. "
+                                         "Use kwarg filepath to set it if need be.")
+                except AttributeError as e:
+                    self._logger.error(e, exc_info=True)
+                    raise e
         else:
             try:
                 raise AttributeError("any purge age instance value must be supplied for TotalPurge to function.")
@@ -195,4 +213,4 @@ class PurgeSecrets:
                 self._logger.error(e, exc_info=True)
                 raise e
         self.PurgeINIValue(config, config_path, secrets_section, secrets_items)
-        self._logger.info("self.TotalPurge complete.")
+        self._logger.info("TotalPurge complete.")
