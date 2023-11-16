@@ -27,6 +27,7 @@ class PurgeSecrets:
         self._purge_age_days: int or None = None
         self.filepath = None
         self._fail_silent = None
+        self.confirm_purge = True
 
         if logger:
             self._logger = logger
@@ -44,6 +45,9 @@ class PurgeSecrets:
                     self._purge_age_minutes: int = int(self._kwargs['purge_age_minutes'])
                 if 'fail_silent' in self._kwargs:
                     self._fail_silent = self._kwargs['fail_silent']
+                if 'confirm_purge' in self._kwargs:
+                    self.confirm_purge = self._kwargs['confirm_purge']
+
             except ValueError as e:
                 self._logger.error(e, exc_info=True)
                 raise e
@@ -137,12 +141,18 @@ class PurgeSecrets:
         return self._purge_age_minutes
 
     def _final_file_check(self, ** kwargs):
+        confirm_purge = self.confirm_purge
         if kwargs:
             if 'filepath' in kwargs:
                 self.filepath = kwargs['filepath']
+            if 'confirm_purge' in kwargs:
+                confirm_purge = kwargs['confirm_purge']
         if self.filepath:
             final_file_check_text = f"Are you sure you want to purge {self.filepath}? (y/n/q): "
-            purge = self._yn(final_file_check_text)
+            if confirm_purge:
+                purge = self._yn(final_file_check_text)
+            else:
+                purge = True
             return purge
         else:
             try:
@@ -176,14 +186,20 @@ class PurgeSecrets:
             self._logger.warning(f"{self.filepath} was NOT PURGED")
 
     def PurgeINIValue(self, config: 'ConfigParser', config_path: str,
-                      secrets_section: str, secrets_items: list):
+                      secrets_section: str, secrets_items: list, **kwargs):
+        if kwargs:
+            if 'confirm_purge' in kwargs:
+                self.confirm_purge = kwargs['confirm_purge']
         self._logger.info(f"attempting to purge [{secrets_section}]{secrets_items} from {config_path.split('/')[-1]}")
         for s in secrets_items:
             if config[secrets_section][s]:
                 config[secrets_section][s] = ''
         final_config_text = (f"Are you sure you want to purge {secrets_section}, {secrets_items} items "
                              f"from {config_path.split('/')[-1]}?")
-        purge = self._yn(final_config_text)
+        if self.confirm_purge:
+            purge = self._yn(final_config_text)
+        else:
+            purge = True
         if purge:
             with open(config_path, 'w') as f:
                 config.write(f)
